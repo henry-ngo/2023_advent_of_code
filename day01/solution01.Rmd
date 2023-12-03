@@ -113,20 +113,63 @@ zoneight234
 # Part 2 Solution attempt
 
 ## Replace written numbers to digit character
-Need to account for cases like `8seveneightwox`, should resolve to `878wox` not `87eigh2x`.
+Need to account for cases like `8seveneightwox`, should resolve to `878wox` not `8782x`. So we can't use `str_replace_all`, which finds all the matches and then replaces them all at once. We could use `str_replace` to do the first match and then repeat But how do we know how many times to repeat without brute force?
+
+Try to define a function that would check for the largest number of matches and then repeat the process N times. 
+
+```{r}
+replacement_fn <- function(match_text){
+  switch(match_text,
+         one = "1",
+         two = "2",
+         three = "3",
+         four = "4",
+         five = "5",
+         six = "6",
+         seven = "7",
+         eight = "8",
+         nine = "9")
+}
+
+replace_num_text_seq <- function(my_str_vec){
+  match_pat <- "(one|two|three|four|five|six|seven|eight|nine)"
+  # Define a function to act on an individual row
+  replace_per_row <- function(input){
+    # Find max number of matches in this row
+    max_steps <- max(stringr::str_count(input, match_pat))
+    # Apply replacement function that many times
+    for(ii in 1:max_steps){
+      input <- stringr::str_replace(input, match_pat, replacement_fn)
+    }
+    return(input)
+  }
+  
+  # Apply to all the rows
+  out <- lapply(my_str_vec, replace_per_row)
+  
+  return(out)
+}
+```
+
+
 ```{r}
 cal_df <- cal_df |> 
-  mutate(input2 = stringr::str_replace_all(input,c(
-    "one" = "1",
-    "two" = "2",
-    "three" = "3",
-    "four" = "4",
-    "five" = "5",
-    "six" = "6",
-    "seven" = "7",
-    "eight" = "8",
-    "nine" = "9"
-  )))
+  mutate(input2 = replace_num_text_seq(input))
+```
+
+```{r}
+# cal_df <- cal_df |> 
+#   mutate(input2 = stringr::str_replace_all(input,c(
+#     "one" = "1",
+#     "two" = "2",
+#     "three" = "3",
+#     "four" = "4",
+#     "five" = "5",
+#     "six" = "6",
+#     "seven" = "7",
+#     "eight" = "8",
+#     "nine" = "9"
+#   )))
 ```
 ### Check output
 ```{r}
