@@ -1,0 +1,179 @@
+---
+title: "Advent of Code Day 1"
+author: Henry Ngo
+date: December 2, 2023
+output: html_notebook
+---
+
+# Part 1 Problem description
+
+> The newly-improved calibration document consists of lines of text; each line originally contained a specific calibration value that the Elves now need to recover. On each line, the calibration value can be found by combining the first digit and the last digit (in that order) to form a single two-digit number.
+>
+> For example:
+
+```{verbatim}
+1abc
+pqr3stu8vwx
+a1b2c3d4e5f
+treb7uchet
+```
+
+> In this example, the calibration values of these four lines are 12, 38, 15, and 77. Adding these together produces 142.
+>
+> Consider your entire calibration document. What is the sum of all of the calibration values?
+
+# Part 1 Solution attempt
+
+## Load libraries
+
+```{r load libraries}
+library(here)
+library(tidyverse)
+library(stringi)
+```
+
+## Load input data
+
+Need `col_names` to avoid reading first line as column headers
+
+```{r}
+cal_df <- readr::read_csv(here::here("day01","input.txt"), col_names="input")
+```
+
+Examine data
+
+```{r}
+head(cal_df)
+```
+
+## Get first and last digit
+
+Store in new columns
+
+```{r}
+cal_df <- cal_df |>
+  dplyr::mutate(
+    first = stringr::str_extract(input, "[0-9]"),
+    last  = stringr::str_extract(stringi::stri_reverse(input), "[0-9]")
+  )
+```
+
+### Check output.
+
+Visual inspection
+
+```{r}
+cal_df
+```
+
+Check for missing
+
+```{r}
+cal_df |> dplyr::summarise(input_sum = sum(is.na(input)),
+                           first_sum = sum(is.na(first)),
+                           last_sum  = sum(is.na(last)))
+```
+
+All zeroes, looks good.
+
+## Create the two-digit number
+
+```{r}
+cal_df <- cal_df |> 
+  tidyr::unite(cal_1, first, last, sep="") |>
+  dplyr::mutate(cal_1 = as.numeric(cal_1))
+```
+
+## Print the sum
+
+```{r}
+cal_df$cal_1 |> sum()
+```
+
+# Part 2 Problem description
+
+> Your calculation isn't quite right. It looks like some of the digits are actually spelled out with letters: one, two, three, four, five, six, seven, eight, and nine also count as valid "digits".
+>
+> Equipped with this new information, you now need to find the real first and last digit on each line. For example:
+
+```{verbatim}
+two1nine
+eightwothree
+abcone2threexyz
+xtwone3four
+4nineeightseven2
+zoneight234
+7pqrstsixteen
+```
+
+> In this example, the calibration values are 29, 83, 13, 24, 42, 14, and 76. Adding these together produces 281.
+>
+> What is the sum of all of the calibration values?
+
+# Part 2 Solution attempt
+
+## Replace written numbers to digit character
+Need to account for cases like `8seveneightwox`, should resolve to `878wox` not `87eigh2x`.
+```{r}
+cal_df <- cal_df |> 
+  mutate(input2 = stringr::str_replace_all(input,c(
+    "one" = "1",
+    "two" = "2",
+    "three" = "3",
+    "four" = "4",
+    "five" = "5",
+    "six" = "6",
+    "seven" = "7",
+    "eight" = "8",
+    "nine" = "9"
+  )))
+```
+### Check output
+```{r}
+cal_df |> select(input, input2)
+```
+
+
+## Get first and last digit again
+
+Store in new columns
+
+```{r}
+cal_df <- cal_df |>
+  dplyr::mutate(
+    first = stringr::str_extract(input2, "[0-9]"),
+    last  = stringr::str_extract(stringi::stri_reverse(input2), "[0-9]")
+  )
+```
+
+### Check output.
+
+Visual inspection
+
+```{r}
+cal_df
+```
+
+Check for missing
+
+```{r}
+cal_df |> dplyr::summarise(input_sum = sum(is.na(input2)),
+                           first_sum = sum(is.na(first)),
+                           last_sum  = sum(is.na(last)))
+```
+
+All zeroes, looks good.
+
+## Create the two-digit number
+
+```{r}
+cal_df <- cal_df |> 
+  tidyr::unite(cal_2, first, last, sep="") |>
+  dplyr::mutate(cal_2 = as.numeric(cal_2))
+```
+
+## Print the sum
+
+```{r}
+cal_df$cal_2 |> sum()
+```
