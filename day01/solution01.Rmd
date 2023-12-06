@@ -115,49 +115,9 @@ zoneight234
 ## Replace written numbers to digit character
 Need to account for cases like `8seveneightwox`, should resolve to `878wox` not `8782x`. So we can't use `str_replace_all`, which finds all the matches and then replaces them all at once. We could use `str_replace` to do the first match and then repeat But how do we know how many times to repeat without brute force?
 
-Try to define a function that would check for the largest number of matches and then repeat the process N times. 
-
-```{r}
-replacement_fn <- function(match_text){
-  switch(match_text,
-         one = "1",
-         two = "2",
-         three = "3",
-         four = "4",
-         five = "5",
-         six = "6",
-         seven = "7",
-         eight = "8",
-         nine = "9")
-}
-
-replace_num_text_seq <- function(my_str_vec){
-  match_pat <- "(one|two|three|four|five|six|seven|eight|nine)"
-  # Define a function to act on an individual row
-  replace_per_row <- function(input){
-    # Find max number of matches in this row
-    max_steps <- max(stringr::str_count(input, match_pat))
-    # Apply replacement function that many times
-    for(ii in 1:max_steps){
-      input <- stringr::str_replace(input, match_pat, replacement_fn)
-    }
-    return(input)
-  }
-  
-  # Apply to all the rows
-  out <- lapply(my_str_vec, replace_per_row)
-  
-  return(out)
-}
-```
-
-
-```{r}
-cal_df <- cal_df |> 
-  mutate(input2 = replace_num_text_seq(input))
-```
-
-```{r}
+### Attempt 1 (failed)
+This was the attempt with `str_replace_all` which ran but did not handle text strings where two numbers shared a letter correctly (e.g. the `8seveneightwox` example above). So next is to try using `str_replace()`
+```{r eval=FALSE}
 # cal_df <- cal_df |> 
 #   mutate(input2 = stringr::str_replace_all(input,c(
 #     "one" = "1",
@@ -171,6 +131,79 @@ cal_df <- cal_df |>
 #     "nine" = "9"
 #   )))
 ```
+
+### Define matching and replacement patterns
+Write a pattern for `stringr::str_replace()` to use for matching and a function using `base::switch()` to tell `str_replace` how to replace the matches it finds.
+```{r}
+match_pat <- "(one|two|three|four|five|six|seven|eight|nine)"
+
+replacement_fn <- function(matched_text_to_replace){
+  switch(matched_text_to_replace,
+         one = "1",
+         two = "2",
+         three = "3",
+         four = "4",
+         five = "5",
+         six = "6",
+         seven = "7",
+         eight = "8",
+         nine = "9")
+}
+```
+
+
+### Attempt 2 (failed)
+Try to define a function that would check for the largest number of matches and then repeat the process N times. 
+
+I think the general idea works (works on a single string) but didn't work when applying to the full data frame
+
+```{r eval=FALSE}
+# replace_num_text_seq <- function(my_str_vec){
+# 
+#   # Define a function to act on an individual row
+#   replace_per_row <- function(input){
+#     # Find max number of matches in this row
+#     max_steps <- max(stringr::str_count(input, match_pat))
+#     # Apply replacement function that many times
+#     for(ii in 1:max_steps){
+#       input <- stringr::str_replace(input, match_pat, replacement_fn)
+#     }
+#     return(input)
+#   }
+#   
+#   # Apply to all the rows
+#   out <- lapply(my_str_vec, replace_per_row)
+#   
+#   return(out)
+# }
+# 
+# cal_df <- cal_df |> 
+#   mutate(input2 = replace_num_text_seq(input))
+```
+### Attempt 3
+Using what we learned above, implement serially as nested for loops. Not pretty, but time to move on!
+
+```{r}
+input_tmp <- cal_df$input
+# Loop through each vector entry individually
+for(ii in 1:length(input_tmp)){
+  #print(ii)
+  input <- input_tmp[ii]
+  # Find the maximum number of matches in this entry
+  max_steps <- max(stringr::str_count(input, match_pat))
+  # Go to next iteration if no matches
+  if(max_steps==0) next
+  # Loop through each replacement in this entry
+  for(jj in 1:max_steps){
+    input <- stringr::str_replace(input, match_pat, replacement_fn)
+  }
+  # Update vector entry
+  input_tmp[ii] <- input
+}
+cal_df$input2 <- input_tmp
+```
+
+
 ### Check output
 ```{r}
 cal_df |> select(input, input2)
