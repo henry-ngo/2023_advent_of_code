@@ -180,45 +180,46 @@ I think the general idea works (works on a single string) but didn't work when a
 # cal_df <- cal_df |> 
 #   mutate(input2 = replace_num_text_seq(input))
 ```
-### Attempt 3
+### Attempt 3 (failed)
 Using what we learned above, implement serially as nested for loops. Not pretty, but time to move on!
 
 ```{r}
-input_tmp <- cal_df$input
-# Loop through each vector entry individually
-for(ii in 1:length(input_tmp)){
-  #print(ii)
-  input <- input_tmp[ii]
-  # Find the maximum number of matches in this entry
-  max_steps <- max(stringr::str_count(input, match_pat))
-  # Go to next iteration if no matches
-  if(max_steps==0) next
-  # Loop through each replacement in this entry
-  for(jj in 1:max_steps){
-    input <- stringr::str_replace(input, match_pat, replacement_fn)
-  }
-  # Update vector entry
-  input_tmp[ii] <- input
-}
-cal_df$input2 <- input_tmp
+# input_tmp <- cal_df$input
+# # Loop through each vector entry individually
+# for(ii in 1:length(input_tmp)){
+#   #print(ii)
+#   input <- input_tmp[ii]
+#   # Find the maximum number of matches in this entry
+#   max_steps <- max(stringr::str_count(input, match_pat))
+#   # Go to next iteration if no matches
+#   if(max_steps==0) next
+#   # Loop through each replacement in this entry
+#   for(jj in 1:max_steps){
+#     input <- stringr::str_replace(input, match_pat, replacement_fn)
+#   }
+#   # Update vector entry
+#   input_tmp[ii] <- input
+# }
+# cal_df$input2 <- input_tmp
 ```
 
+### Attempt 4
+Thanks to people on BlueSky, learned that I'm overthinking the edge cases like `oneight`. String replacement is not needed! 
 
-### Check output
+We just need the first and last digit, whether it's a digit or the number spelled out. So we just need to modify the Part 1 solution to include the text form of numbers
+
+#### Define match pattern
 ```{r}
-cal_df |> select(input, input2)
+match_pat2 <-  "([1-9]|one|two|three|four|five|six|seven|eight|nine)"
+match_pat2_rev <- "([1-9]|eno|owt|eerht|ruof|evif|xis|neves|thgie|enin)"
 ```
 
-
-## Get first and last digit again
-
-Store in new columns
-
+#### Get first and last
 ```{r}
 cal_df <- cal_df |>
   dplyr::mutate(
-    first = stringr::str_extract(input2, "[0-9]"),
-    last  = stringr::str_extract(stringi::stri_reverse(input2), "[0-9]")
+    first2 = stringr::str_extract(input, match_pat2),
+    last2  = stringr::str_extract(stringi::stri_reverse(input), match_pat2_rev)
   )
 ```
 
@@ -233,18 +234,48 @@ cal_df
 Check for missing
 
 ```{r}
-cal_df |> dplyr::summarise(input_sum = sum(is.na(input2)),
-                           first_sum = sum(is.na(first)),
-                           last_sum  = sum(is.na(last)))
+cal_df |> dplyr::summarise(first_sum2 = sum(is.na(first2)),
+                           last_sum2  = sum(is.na(last2)))
 ```
 
 All zeroes, looks good.
 
 ## Create the two-digit number
+First, we have to handle the text. Convert the spelled-out numbers as well as the character form into a numeric digit.
+
+### Convert char digit and text to numeric
+```{r}
+cal_df <- cal_df |>
+  dplyr::mutate(
+    first2 = dplyr::case_when(
+      first2 %in% c("1", "one") ~ 1,
+      first2 %in% c("2", "two") ~ 2,
+      first2 %in% c("3", "three") ~ 3,
+      first2 %in% c("4", "four") ~ 4,
+      first2 %in% c("5", "five") ~ 5,
+      first2 %in% c("6", "six") ~ 6,
+      first2 %in% c("7", "seven") ~ 7,
+      first2 %in% c("8", "eight") ~ 8,
+      first2 %in% c("9", "nine") ~ 9
+    ),
+    last2 = dplyr::case_when(
+      last2 %in% c("1", "eno") ~ 1,
+      last2 %in% c("2", "owt") ~ 2,
+      last2 %in% c("3", "eerht") ~ 3,
+      last2 %in% c("4", "ruof") ~ 4,
+      last2 %in% c("5", "evif") ~ 5,
+      last2 %in% c("6", "xis") ~ 6,
+      last2 %in% c("7", "neves") ~ 7,
+      last2 %in% c("8", "thgie") ~ 8,
+      last2 %in% c("9", "enin") ~ 9
+    )
+  )
+```
+
 
 ```{r}
 cal_df <- cal_df |> 
-  tidyr::unite(cal_2, first, last, sep="") |>
+  tidyr::unite(cal_2, first2, last2, sep="") |>
   dplyr::mutate(cal_2 = as.numeric(cal_2))
 ```
 
