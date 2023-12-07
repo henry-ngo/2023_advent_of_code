@@ -5,5 +5,6 @@ This year, I'm trying to implement solutions with R and `tidyverse` using R Note
 
 ## Progress
 Day 01  :star: :star:
+
 Day 02  :hourglass:
 
