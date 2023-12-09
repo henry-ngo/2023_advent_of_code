@@ -1,0 +1,153 @@
+---
+title: "Advent of Code Day 2"
+author: Henry Ngo
+date: December 8, 2023
+output: html_notebook
+---
+
+# Part 1 Problem description
+
+>As you walk, the Elf shows you a small bag and some cubes which are either red, green, or blue. Each time you play this game, he will hide a secret number of cubes of each color in the bag, and your goal is to figure out information about the number of cubes.
+>
+>To get information, once a bag has been loaded with cubes, the Elf will reach into the bag, grab a handful of random cubes, show them to you, and then put them back in the bag. He'll do this a few times per game.
+>
+>You play several games and record the information from each game (your puzzle input). Each game is listed with its ID number (like the 11 in Game 11: ...) followed by a semicolon-separated list of subsets of cubes that were revealed from the bag (like 3 red, 5 green, 4 blue).
+>
+>For example, the record of a few games might look like this:
+
+```{verbatim}
+Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
+```
+
+>In game 1, three sets of cubes are revealed from the bag (and then put back again). The first set is 3 blue cubes and 4 red cubes; the second set is 1 red cube, 2 green cubes, and 6 blue cubes; the third set is only 2 green cubes.
+>
+>The Elf would first like to know which games would have been possible if the bag contained only 12 red cubes, 13 green cubes, and 14 blue cubes?
+>
+>In the example above, games 1, 2, and 5 would have been possible if the bag had been loaded with that configuration. However, game 3 would have been impossible because at one point the Elf showed you 20 red cubes at once; similarly, game 4 would also have been impossible because the Elf showed you 15 blue cubes at once. If you add up the IDs of the games that would have been possible, you get 8.
+>
+>Determine which games would have been possible if the bag had been loaded with only 12 red cubes, 13 green cubes, and 14 blue cubes. What is the sum of the IDs of those games?
+
+# Part 1 Solution attempt
+
+## Load libraries
+
+```{r load libraries}
+library(here)
+library(tidyverse)
+```
+
+## Code problem parameters
+```{r}
+max_red <- 12
+max_green <- 13
+max_blue <- 14
+```
+
+
+## Load input data
+
+Need `col_names` to avoid reading first line as column headers. Using `read_delim` to delimit by colon (separate out game label and game results)
+
+```{r}
+df <- readr::read_delim(
+  here::here("day02","input.txt"),
+  delim = ":",
+  col_names=c("game_label", "game_results"))
+```
+
+Examine data
+
+```{r}
+head(df)
+```
+## Parse game label
+We want to drop the "Game" and only keep the digits as the `game_id`.
+
+Separate first column by the whitespace character
+```{r}
+df <- df |> tidyr::separate_wider_delim(game_label, delim=" ", names = c("game_txt", "game_id"))
+df
+```
+
+Drop `game` and convert `id` to numeric
+```{r}
+df <- df |> select(-game_txt) |> mutate(game_id = as.numeric(game_id))
+df
+```
+## Parse game results
+
+### Get one set per row
+First separate *longer* by semi-colon so that each set of each game is on its own row. (I'm thinking that a long table would be easiest to check for validity!). Also add a set_id variable to track each set within each game.
+```{r}
+df <- df |> 
+  tidyr::separate_longer_delim(game_results, delim = ";") |>
+  dplyr::group_by(game_id) |> 
+  dplyr::mutate(set_id = row_number(), .before="game_results") |>
+  dplyr::ungroup()
+df
+```
+
+### Parse set results
+Now, separate longer again, but by comma to get each colour & number in its own column.
+```{r}
+df <- df |> tidyr::separate_longer_delim(game_results, delim=",")
+df
+```
+Then, separate out the number and the colour. Note that `$game_results` has a leading whitespace character which we drop with the first element of `names` being `NA`.
+```{r}
+df <- df |> 
+  tidyr::separate_wider_delim(game_results, 
+                              delim = " ", 
+                              names = c(NA, "number", "colour")) |>
+  dplyr::mutate(number = as.numeric(number))
+df
+```
+Finally, now that we have the number and colour in long format, we can pivot wider to go back to one row per set and columns indicating how many of each colour, with column names indicating the colour! Use `values_fill` to fill in missing counts as zero.
+```{r}
+df <- df |> tidyr::pivot_wider(names_from = colour, values_from = number, values_fill = 0)
+df
+```
+### Save copy of cleaned data frame
+In case we want to use this cleaned input for later.
+```{r}
+cleaned_df <- df
+```
+
+
+## Check for set validity
+Now, we just have to check whether each set is valid, based on the allowed number of red, green and blue cubes. We can use a flag variable with value of `0` if the set is valid and `1` if it's invalid. This will allow us to group by `game_id` and sum the flags for the sets within the game. 
+
+First check that each cube colour & number is valid.
+```{r}
+df1 <- cleaned_df |>
+  dplyr::mutate(
+    flag_cubes = dplyr::case_when(
+      colour=="red" & number <= max_red ~ 0,
+      colour=="red" & number > max_red ~ 1,
+      colour=="green" & number <= max_green ~ 0,
+      colour=="green" & number > max_green ~ 1,
+      colour=="blue" & number <= max_blue ~ 0,
+      colour=="blue" & number > max_blue ~ 1
+    )
+  )
+df1
+```
+
+Then, group by game_id and sum up the flags. Only sums of zeroes are valid games. (We can bypass checking for each set)
+
+```{r}
+df1 <- df1 |> 
+  dplyr::group_by(game_id) |>
+  dplyr::summarise(flag_sum = sum(flag_cubes))
+df1
+```
+
+## Report on sum of game ids that are possible
+```{r}
+df1 |> dplyr::filter(flag_sum==0) |> pull(game_id) |> sum()
+```
+
