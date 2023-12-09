@@ -99,22 +99,23 @@ df
 ```
 Then, separate out the number and the colour. Note that `$game_results` has a leading whitespace character which we drop with the first element of `names` being `NA`.
 ```{r}
-df <- df |> 
+df_long <- df |> 
   tidyr::separate_wider_delim(game_results, 
                               delim = " ", 
                               names = c(NA, "number", "colour")) |>
   dplyr::mutate(number = as.numeric(number))
-df
+df_long
 ```
 Finally, now that we have the number and colour in long format, we can pivot wider to go back to one row per set and columns indicating how many of each colour, with column names indicating the colour! Use `values_fill` to fill in missing counts as zero.
 ```{r}
-df <- df |> tidyr::pivot_wider(names_from = colour, values_from = number, values_fill = 0)
-df
+df_wide <- df_long |> tidyr::pivot_wider(names_from = colour, values_from = number, values_fill = 0)
+df_wide
 ```
-### Save copy of cleaned data frame
-In case we want to use this cleaned input for later.
+### Saving cleaned output for later
+We note that `df_long` and `df_wide` can be used for future solving.
 ```{r}
-cleaned_df <- df
+df_long
+df_wide
 ```
 
 
@@ -123,7 +124,7 @@ Now, we just have to check whether each set is valid, based on the allowed numbe
 
 First check that each cube colour & number is valid.
 ```{r}
-df1 <- cleaned_df |>
+df1 <- df_long |>
   dplyr::mutate(
     flag_cubes = dplyr::case_when(
       colour=="red" & number <= max_red ~ 0,
@@ -149,5 +150,52 @@ df1
 ## Report on sum of game ids that are possible
 ```{r}
 df1 |> dplyr::filter(flag_sum==0) |> pull(game_id) |> sum()
+```
+# Part 2 Problem description
+>As you continue your walk, the Elf poses a second question: in each game you played, what is the fewest number of cubes of each color that could have been in the bag to make the game possible?
+>
+>Again consider the example games from earlier:
+
+```{verbatim}
+Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
+```
+
+>In game 1, the game could have been played with as few as 4 red, 2 green, and 6 blue cubes. If any color had even one fewer cube, the game would have been impossible.
+>Game 2 could have been played with a minimum of 1 red, 3 green, and 4 blue cubes.
+>Game 3 must have been played with at least 20 red, 13 green, and 6 blue cubes.
+>Game 4 required at least 14 red, 3 green, and 15 blue cubes.
+>Game 5 needed no fewer than 6 red, 3 green, and 2 blue cubes in the bag.
+>The power of a set of cubes is equal to the numbers of red, green, and blue cubes multiplied together. The power of the minimum set of cubes in game 1 is 48. In games 2-5 it was 12, 1560, 630, and 36, respectively. Adding up these five powers produces the sum 2286.
+>
+>For each game, find the minimum set of cubes that must have been present. What is the sum of the power of these sets?
+
+## Create dataframe from cleaned data
+We can use the cleaned data again. For this part, we want the wide dataset
+```{r}
+df2 <- df_wide
+df2
+```
+## Find the max of each colour drawn for each game
+```{r}
+df2 <- df2 |>
+  dplyr::group_by(game_id) |>
+  dplyr::summarise(max_red = max(red),
+                   max_green = max(green),
+                   max_blue = max(blue))
+df2
+```
+## Calculate power of each game
+```{r}
+df2 <- df2 |> dplyr::mutate(power = max_red*max_green*max_blue)
+df2
+```
+## Get the answer
+Sum of the powers
+```{r}
+df2$power |> sum()
 ```
 
